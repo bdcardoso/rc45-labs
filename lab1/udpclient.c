@@ -1,25 +1,25 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/socket.h>
 #include <unistd.h>
 
-#define PORT 58000
+#define PORT 59000
 
-int main(int argc, char *argv[]) {
-  char *hname = "localhost";
-  int fd, newfd;
+int main(int argc, char **argv) {
+  int fd;
+  const char *hname = "localhost";
   struct hostent *hostptr;
   struct sockaddr_in serveraddr, clientaddr;
-  int clientlen;
+  int addrlen;
 
   if (argc > 1) {
     hname = argv[1];
   }
 
-  fd = socket(AF_INET, SOCK_STREAM, 0);
+  fd = socket(AF_INET, SOCK_DGRAM, 0);
   hostptr = gethostbyname(hname);
 
   memset((void *)&serveraddr, '\0', sizeof(serveraddr));
@@ -27,23 +27,21 @@ int main(int argc, char *argv[]) {
   serveraddr.sin_addr.s_addr = ((struct in_addr *)(hostptr->h_addr_list[0]))->s_addr;
   serveraddr.sin_port = htons((unsigned short)PORT);
 
-  connect(fd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
+  addrlen = sizeof(serveraddr);  
 
   for (;;) {
-    char buf[100];
-    if (scanf("%s", buf) == EOF)
+    char inbuff[100];
+    if (scanf("%s", inbuff) == EOF)
       break;
 
-    buf[99] = '\0';
+    inbuff[99] = '\0';
 
-    write(fd, buf, sizeof(buf) - 1);
-    // printf("[Client] Sent: hello\n");
+    sendto(fd, inbuff, strlen(inbuff) + 1, 0, (struct sockaddr *)&serveraddr, addrlen);
 
-    printf("Server reply:\n");
-    while (read(fd, buf, sizeof(buf) - 1) > 0) {
-      printf("%s", buf);
-    }
-    printf("\n");
+    char buffer[4 << 10];
+    recvfrom(fd, buffer, sizeof(buffer), 0, (struct sockaddr *)&serveraddr, &addrlen);
+    buffer[sizeof(buffer) - 1] = '\0';
+    printf("%s\n", buffer);
   }
 
   close(fd);
